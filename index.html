@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>「10」週年星空光暈 · 拉桿工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link id="gfont" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@200..1000&family=Quicksand:wght@300..700&family=Fredoka:wght@300..700&family=Baloo+2:wght@400..800&family=Comfortaa:wght@300..700&family=Poppins:wght@100..900&family=Montserrat:wght@100..900&family=Playfair+Display:wght@400..900&display=swap">
+<style>
+
+  :root{ --bg:#0b0d13; --panel:#141824; --panel2:#1b2030; --line:#2a3040; --text:#e7ebf3; --sub:#9aa3b8; --accent:#ffd24a; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,"PingFang TC","Helvetica Neue",Arial,sans-serif; }
+  .wrap{ display:flex; min-height:100vh; }
+  .panel{ width:340px; flex:0 0 340px; background:var(--panel); border-right:1px solid var(--line); padding:18px 16px 60px; overflow-y:auto; height:100vh; }
+  .stage{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; gap:16px; }
+  h1{ font-size:16px; margin:0 0 2px; letter-spacing:.5px; }
+  .hint{ color:var(--sub); font-size:12px; margin:0 0 16px; line-height:1.5; }
+  .group{ margin-bottom:16px; border-top:1px solid var(--line); padding-top:12px; }
+  .group h2{ font-size:12px; color:var(--sub); margin:0 0 10px; font-weight:600; letter-spacing:1px; }
+  .row{ margin-bottom:12px; }
+  .row label{ display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:5px; color:var(--text); }
+  .row label .val{ color:var(--accent); font-variant-numeric:tabular-nums; }
+  input[type=range]{ width:100%; accent-color:var(--accent); }
+  .colors{ display:flex; gap:8px; }
+  .colors .c{ flex:1; text-align:center; }
+  .colors .c span{ display:block; font-size:10.5px; color:var(--sub); margin-bottom:4px; }
+  input[type=color]{ width:100%; height:30px; border:1px solid var(--line); border-radius:6px; background:var(--panel2); padding:2px; cursor:pointer; }
+  .btns{ display:flex; gap:8px; flex-wrap:wrap; }
+  button{ font:inherit; font-size:13px; padding:9px 12px; border-radius:8px; border:1px solid var(--line); background:var(--panel2); color:var(--text); cursor:pointer; }
+  button:hover{ border-color:#3a4258; background:#222838; }
+  button.primary{ background:var(--accent); color:#211a00; border-color:var(--accent); font-weight:700; }
+  select{ font:inherit; font-size:13px; padding:8px; border-radius:8px; border:1px solid var(--line); background:var(--panel2); color:var(--text); }
+  canvas#view{ width:min(76vh,720px); height:min(76vh,720px); border-radius:14px; box-shadow:0 10px 40px rgba(0,0,0,.6); background:#000; }
+  .stagebar{ display:flex; gap:10px; align-items:center; }
+  .seedline{ display:flex; gap:8px; align-items:center; }
+  .seedline input{ width:80px; font:inherit; padding:7px; border-radius:7px; border:1px solid var(--line); background:var(--panel2); color:var(--text); }
+  .foot{ color:var(--sub); font-size:11.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel">
+    <h1>「10」週年星空光暈</h1>
+    <p class="hint">拉一下就即時看到變化，滿意後按右下角「下載 PNG」。純黑深空＋四色發光光點勾出 10，構圖不會跑掉。</p>
+
+    <div class="group">
+      <h2>排列</h2>
+      <div class="row seedline">
+        <label style="margin:0;">SEED（換一組排列）</label>
+        <input type="number" id="seed" value="11">
+        <button id="reseed">🎲 隨機</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>「10」字體</h2>
+      <div class="row"><label>字體</label>
+        <select id="fontsel" style="width:100%;">
+          <option value='"Nunito"|800'>Nunito 圓體（預設）</option>
+          <option value='"Quicksand"|600'>Quicksand 圓體幾何</option>
+          <option value='"Fredoka"|600'>Fredoka 圓潤</option>
+          <option value='"Baloo 2"|700'>Baloo 2 圓胖</option>
+          <option value='"Comfortaa"|600'>Comfortaa 圓體</option>
+          <option value='"Poppins"|700'>Poppins 幾何無襯線</option>
+          <option value='"Montserrat"|800'>Montserrat 無襯線</option>
+          <option value='"Playfair Display"|800'>Playfair 優雅襯線</option>
+        </select>
+      </div>
+      <div class="row"><label>自訂字體名稱（選填）</label>
+        <input type="text" id="fontcustom" placeholder="輸入任一 Google Fonts 字體名，例如 Righteous" style="width:100%;padding:8px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;"></div>
+      <div class="row"><label>字重 <span class="val" id="v_fw"></span></label><input type="range" id="fw" min="200" max="900" step="100" value="800"></div>
+    </div>
+
+    <div class="group">
+      <h2>「10」與光暈</h2>
+      <div class="row"><label>光暈強度 <span class="val" id="v_glow"></span></label><input type="range" id="glow" min="0.3" max="2" step="0.05" value="1"></div>
+      <div class="row"><label>10 明顯度（微星塵）<span class="val" id="v_dust"></span></label><input type="range" id="dust" min="0" max="0.25" step="0.01" value="0"></div>
+      <div class="row"><label>顆粒大小 <span class="val" id="v_psize"></span></label><input type="range" id="psize" min="0.6" max="1.6" step="0.05" value="1"></div>
+      <div class="row"><label>輪廓密度 <span class="val" id="v_dens"></span></label><input type="range" id="dens" min="8" max="26" step="1" value="15"></div>
+      <div class="row"><label>柔焦散景比例 <span class="val" id="v_soft"></span></label><input type="range" id="soft" min="0" max="0.6" step="0.02" value="0.28"></div>
+      <div class="row"><label>外圍飄散量 <span class="val" id="v_scat"></span></label><input type="range" id="scat" min="0" max="4000" step="100" value="2600"></div>
+    </div>
+
+    <div class="group">
+      <h2>星空背景</h2>
+      <div class="row"><label>星點數 <span class="val" id="v_stars"></span></label><input type="range" id="stars" min="0" max="3000" step="50" value="1400"></div>
+      <div class="row"><label>星芒數 <span class="val" id="v_spark"></span></label><input type="range" id="spark" min="0" max="60" step="1" value="22"></div>
+      <div class="row"><label>星雲層次 <span class="val" id="v_neb"></span></label><input type="range" id="neb" min="0" max="1.5" step="0.05" value="0.6"></div>
+      <div class="row"><label>暗角 <span class="val" id="v_vig"></span></label><input type="range" id="vig" min="0" max="0.8" step="0.02" value="0.45"></div>
+      <div class="row"><label>背景色</label><input type="color" id="bg" value="#06080e"></div>
+    </div>
+
+    <div class="group">
+      <h2>四色校準</h2>
+      <div class="colors">
+        <div class="c"><span>珊瑚紅</span><input type="color" id="c0" value="#d65a6e"></div>
+        <div class="c"><span>藍綠</span><input type="color" id="c1" value="#52b4a3"></div>
+        <div class="c"><span>萊姆綠</span><input type="color" id="c2" value="#aace4e"></div>
+        <div class="c"><span>檸檬黃</span><input type="color" id="c3" value="#f3ee6d"></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>其他</h2>
+      <div class="btns"><button id="reset">↺ 全部回復預設</button></div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <canvas id="view" width="1000" height="1000"></canvas>
+    <div class="stagebar">
+      <label class="foot">下載尺寸：</label>
+      <select id="expsize">
+        <option value="1600">1600 × 1600（螢幕）</option>
+        <option value="3200" selected>3200 × 3200（高解析）</option>
+        <option value="4800">4800 × 4800（印刷大圖）</option>
+      </select>
+      <button class="primary" id="download">⬇ 下載 PNG</button>
+      <span class="foot" id="status"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const LOGI = 1600;                 // 邏輯設計空間（所有尺寸以此為基準）
+const MASKRES = 800;               // 遮罩掃描解析度
+const view = document.getElementById('view');
+const vctx = view.getContext('2d');
+
+// ---------- 種子亂數 ----------
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+// ---------- 參數 ----------
+const P = {};
+function readParams(){
+  P.seed=+seed.value; P.glow=+glow.value; P.dust=+dust.value; P.psize=+psize.value;
+  P.dens=+dens.value; P.soft=+soft.value; P.scat=+scat.value; P.stars=+stars.value;
+  P.spark=+spark.value; P.neb=+neb.value; P.vig=+vig.value; P.bg=bg.value;
+  P.cols=[c0.value,c1.value,c2.value,c3.value];
+  const _sf=document.getElementById('fontsel').value.split('|'); const _cust=document.getElementById('fontcustom').value.trim();
+  P.fontFamily=_cust?('"'+_cust+'"'):_sf[0]; P.fontWeight=document.getElementById('fw').value;
+  v_fw.textContent=P.fontWeight;
+  // labels
+  v_glow.textContent=P.glow.toFixed(2); v_dust.textContent=P.dust.toFixed(2);
+  v_psize.textContent=P.psize.toFixed(2); v_dens.textContent=P.dens;
+  v_soft.textContent=P.soft.toFixed(2); v_scat.textContent=P.scat;
+  v_stars.textContent=P.stars; v_spark.textContent=P.spark;
+  v_neb.textContent=P.neb.toFixed(2); v_vig.textContent=P.vig.toFixed(2);
+}
+function hex2rgb(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+
+// ---------- 遮罩（只算一次）：得到「10」內部像素與輪廓點（LOGI 空間）----------
+let INSIDE=null, OUTLINE=[], FIELD=null;
+function buildMask(){
+  const m=document.createElement('canvas'); m.width=m.height=MASKRES;
+  const mc=m.getContext('2d');
+  mc.fillStyle='#000'; mc.fillRect(0,0,MASKRES,MASKRES);
+  mc.fillStyle='#fff'; mc.textAlign='center'; mc.textBaseline='middle';
+  const _fam=(P.fontFamily||'"Nunito"'), _fw=(P.fontWeight||'800');
+  mc.font=`${_fw} ${Math.round(MASKRES*0.62)}px ${_fam},"Helvetica Neue",Arial,sans-serif`;
+  mc.fillText('10', MASKRES/2, MASKRES/2);
+  const d=mc.getImageData(0,0,MASKRES,MASKRES).data;
+  const ins=new Uint8Array(MASKRES*MASKRES);
+  for(let i=0;i<ins.length;i++) ins[i]= d[i*4]>128?1:0;
+  INSIDE=ins;
+  // 輪廓帶：內部像素且環狀鄰居有在外面
+  const R=Math.max(3,Math.round(9*MASKRES/LOGI));
+  const idx=(x,y)=>y*MASKRES+x; OUTLINE=[];
+  const offs=[[R,0],[-R,0],[0,R],[0,-R],[R,R],[-R,-R],[R,-R],[-R,R]];
+  for(let y=R;y<MASKRES-R;y++)for(let x=R;x<MASKRES-R;x++){
+    if(!ins[idx(x,y)])continue;
+    for(const o of offs){ if(!ins[idx(x+o[0],y+o[1])]){ OUTLINE.push([x*LOGI/MASKRES,y*LOGI/MASKRES]); break; } }
+  }
+  // 距離場（給外圍飄散用）：模糊剪影
+  const f=document.createElement('canvas'); f.width=f.height=MASKRES; const fc=f.getContext('2d');
+  fc.filter=`blur(${Math.round(120*MASKRES/LOGI)}px)`;
+  fc.drawImage(m,0,0); fc.filter='none';
+  FIELD=fc.getImageData(0,0,MASKRES,MASKRES).data;
+}
+function insideAt(x,y){ const mx=(x*MASKRES/LOGI)|0, my=(y*MASKRES/LOGI)|0; if(mx<0||my<0||mx>=MASKRES||my>=MASKRES)return false; return INSIDE[my*MASKRES+mx]===1; }
+function fieldAt(x,y){ const mx=(x*MASKRES/LOGI)|0, my=(y*MASKRES/LOGI)|0; if(mx<0||my<0||mx>=MASKRES||my>=MASKRES)return 0; return FIELD[(my*MASKRES+mx)*4]/255; }
+
+// ---------- 產生顆粒（LOGI 空間）----------
+let PARTS=[], STARS=[], SPARKS=[];
+function generate(){
+  const rnd=mulberry32(P.seed>>>0);
+  const cell=Math.max(6,P.dens); const grid=new Map();
+  const key=(x,y)=>((x/cell)|0)+","+((y/cell)|0);
+  function far(x,y,dd){
+    const cx=(x/cell)|0, cy=(y/cell)|0;
+    for(let gx=cx-1;gx<=cx+1;gx++)for(let gy=cy-1;gy<=cy+1;gy++){
+      const a=grid.get(gx+","+gy); if(!a)continue;
+      for(const p of a){ const ddx=p[0]-x, ddy=p[1]-y; if(ddx*ddx+ddy*ddy<dd*dd)return false; } }
+    return true;
+  }
+  function put(x,y){ const k=((x/cell)|0)+","+((y/cell)|0); let a=grid.get(k); if(!a){a=[];grid.set(k,a);} a.push([x,y]); }
+  PARTS=[];
+  const outlineSizes=[12,15,18,22,26,32,40];
+  const pts=OUTLINE.slice(); for(let i=pts.length-1;i>0;i--){ const j=(rnd()*(i+1))|0; [pts[i],pts[j]]=[pts[j],pts[i]]; }
+  for(const pt of pts){
+    let sz=outlineSizes[(rnd()*outlineSizes.length)|0]*P.psize*(0.8+rnd()*0.3);
+    const j=sz*0.25; const x=pt[0]+(rnd()*2-1)*j, y=pt[1]+(rnd()*2-1)*j;
+    if(far(x,y,Math.max(P.dens,sz*0.5))){ PARTS.push({x,y,sz,si:(rnd()*4)|0,rot:rnd()*Math.PI*2,soft:rnd()<P.soft}); put(x,y); }
+  }
+  const scatSizes=[6,8,10,13,16,20];
+  for(let i=0;i<P.scat;i++){
+    const x=rnd()*LOGI, y=rnd()*LOGI;
+    if(rnd()<fieldAt(x,y)*0.9 && !insideAt(x,y)){
+      const sz=scatSizes[(rnd()*scatSizes.length)|0]*P.psize*(0.8+rnd()*0.35);
+      if(far(x,y,sz*0.7)){ PARTS.push({x,y,sz,si:(rnd()*4)|0,rot:rnd()*Math.PI*2,soft:rnd()<P.soft+0.07}); put(x,y); }
+    }
+  }
+  // micro dust
+  PARTS.forEach(p=>p.dust=false);
+  if(P.dust>0){ for(const pt of OUTLINE){ if(rnd()<P.dust){ PARTS.push({x:pt[0]+(rnd()*12-6),y:pt[1]+(rnd()*12-6),sz:(1.2+rnd()*2)*P.psize,si:(rnd()*5)|0,rot:0,soft:false,micro:true}); } } }
+  // stars
+  const rs=mulberry32((P.seed*7+3)>>>0); STARS=[]; SPARKS=[];
+  for(let i=0;i<P.stars;i++){ const b=rs(); STARS.push({x:rs()*LOGI,y:rs()*LOGI,b,t:rs()}); }
+  for(let i=0;i<P.spark;i++){ SPARKS.push({x:80+rs()*(LOGI-160),y:80+rs()*(LOGI-160),L:14+rs()*20}); }
+}
+
+// ---------- 畫單一形狀（已 translate/rotate；中心 0,0）----------
+function shapePath(ctx,type,sz){
+  if(type===3){ ctx.beginPath(); ctx.arc(0,0,sz*0.42,0,7); ctx.fill(); return; }         // circle
+  if(type===0){ const w=sz*0.42,h=sz*0.92; ctx.beginPath(); ctx.roundRect(-w/2,-h/2,w,h,w/2); ctx.fill(); return; } // capsule
+  if(type===1){ const s=sz*0.72; ctx.rotate(Math.PI/4); ctx.beginPath(); ctx.roundRect(-s/2,-s/2,s,s,s*0.28); ctx.fill(); return; } // diamond
+  if(type===2){ const r=sz*0.30,cr=sz*0.16; const pts=[]; for(const a of [-90,34,146]){ const rad=a*Math.PI/180; pts.push([Math.cos(rad)*r,Math.sin(rad)*r+sz*0.04]); } // waterdrop
+    ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); ctx.lineTo(pts[1][0],pts[1][1]); ctx.lineTo(pts[2][0],pts[2][1]); ctx.closePath(); ctx.fill();
+    for(const p of pts){ ctx.beginPath(); ctx.arc(p[0],p[1],cr,0,7); ctx.fill(); } return; }
+  if(type===4){ ctx.beginPath(); ctx.arc(0,0,sz*0.5,0,7); ctx.fill(); return; }             // micro dust dot (white)
+}
+function drawParticles(ctx,g,which){
+  const cols=P.cols.map(hex2rgb);
+  for(const p of PARTS){
+    if(which==='soft' && !p.soft) continue;
+    if(which==='sharp' && p.soft) continue;
+    let rgb = p.si<4 ? cols[p.si] : [255,255,255];
+    ctx.save(); ctx.translate(p.x*g,p.y*g); ctx.rotate(p.rot);
+    ctx.fillStyle=`rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    shapePath(ctx, p.micro?4:p.si, p.sz*g);
+    ctx.restore();
+  }
+}
+
+// ---------- 渲染到任意尺寸 ----------
+function renderTo(ctx, CS){
+  const g=CS/LOGI;
+  ctx.globalCompositeOperation='source-over'; ctx.filter='none';
+  ctx.fillStyle=P.bg; ctx.fillRect(0,0,CS,CS);
+
+  // nebula
+  if(P.neb>0){
+    const nb=document.createElement('canvas'); nb.width=nb.height=CS; const nc=nb.getContext('2d');
+    nc.fillStyle='#fff'; nc.textAlign='center'; nc.textBaseline='middle';
+    nc.filter=`blur(${140*g}px)`;
+    nc.font=`${(P.fontWeight||'800')} ${Math.round(1000*g)}px ${(P.fontFamily||'"Nunito"')},"Helvetica Neue",Arial,sans-serif`;
+    nc.fillText('10',CS/2,CS/2); nc.filter='none';
+    nc.globalCompositeOperation='source-in'; nc.fillStyle='rgb(13,16,28)'; nc.fillRect(0,0,CS,CS);
+    ctx.globalAlpha=P.neb; ctx.globalCompositeOperation='lighter'; ctx.drawImage(nb,0,0); ctx.globalAlpha=1;
+  }
+
+  // sharp & soft layers (offscreen at CS)
+  const sh=document.createElement('canvas'); sh.width=sh.height=CS; const shc=sh.getContext('2d'); drawParticles(shc,g,'sharp');
+  const so=document.createElement('canvas'); so.width=so.height=CS; const soc=so.getContext('2d'); drawParticles(soc,g,'soft');
+
+  // soft defocused (blurred, lighter)
+  ctx.globalCompositeOperation='lighter';
+  for(const [r,w] of [[6,0.9],[16,0.5],[40,0.35]]){ ctx.globalAlpha=w; ctx.filter=`blur(${r*g}px)`; ctx.drawImage(so,0,0);}
+  ctx.filter='none'; ctx.globalAlpha=1;
+
+  // bloom from sharp
+  for(const [r,w] of [[4,0.7],[11,0.55],[28,0.4],[70,0.24],[140,0.14]]){ ctx.globalAlpha=Math.min(1,w*P.glow); ctx.filter=`blur(${r*g}px)`; ctx.drawImage(sh,0,0);}
+  ctx.filter='none'; ctx.globalAlpha=1;
+
+  // stars
+  const st=document.createElement('canvas'); st.width=st.height=CS; const stc=st.getContext('2d');
+  for(const s of STARS){ const inten=(0.25+0.75*s.b*s.b); const rr=Math.max(1,(s.b<0.7?1:2)*g*0.7);
+    let c; if(s.t<0.72)c=`rgba(255,255,255,${inten})`; else if(s.t<0.9)c=`rgba(205,225,255,${inten})`; else c=`rgba(255,240,205,${inten})`;
+    stc.fillStyle=c; stc.beginPath(); stc.arc(s.x*g,s.y*g,rr,0,7); stc.fill(); }
+  stc.strokeStyle='rgba(150,165,195,0.7)'; stc.lineWidth=Math.max(1,g*0.7);
+  for(const s of SPARKS){ const L=s.L*g,x=s.x*g,y=s.y*g; stc.beginPath(); stc.moveTo(x-L,y); stc.lineTo(x+L,y); stc.moveTo(x,y-L); stc.lineTo(x,y+L); stc.stroke();
+    stc.fillStyle='#fff'; stc.beginPath(); stc.arc(x,y,2*g,0,7); stc.fill(); }
+  ctx.globalCompositeOperation='lighter'; ctx.filter=`blur(${0.6*g}px)`; ctx.drawImage(st,0,0); ctx.filter='none';
+
+  // crisp cores
+  ctx.drawImage(sh,0,0);
+
+  // vignette
+  ctx.globalCompositeOperation='multiply';
+  const vg=ctx.createRadialGradient(CS/2,CS/2,CS*0.2,CS/2,CS/2,CS*0.72);
+  vg.addColorStop(0,'#ffffff'); vg.addColorStop(1,`rgba(${Math.round(255*(1-P.vig*0.5))},${Math.round(255*(1-P.vig*0.5))},${Math.round(255*(1-P.vig*0.5))},1)`);
+  ctx.fillStyle=vg; ctx.fillRect(0,0,CS,CS);
+  ctx.globalCompositeOperation='source-over';
+}
+
+// ---------- 事件 ----------
+let raf=null;
+function schedule(){ readParams(); if(raf)cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>{ generate(); renderTo(vctx, view.width); }); }
+const FONTCTRL=['fontsel','fontcustom','fw'];
+// 等 web 字體真的載入完成，canvas 才畫得出來（否則會用替代字體）
+async function ensureFont(){ try{ await document.fonts.load(`${P.fontWeight||400} 100px ${P.fontFamily||'"Nunito"'}`); }catch(e){} }
+async function rebuildSchedule(){ readParams(); await ensureFont(); buildMask(); schedule(); }
+// 自訂欄位：動態載入任一 Google Fonts 字體
+let customTimer=null;
+async function loadCustomFont(){
+  const name=document.getElementById('fontcustom').value.trim();
+  if(name){ let l=document.getElementById('customfont'); if(!l){ l=document.createElement('link'); l.id='customfont'; l.rel='stylesheet'; document.head.appendChild(l); }
+    l.href=`https://fonts.googleapis.com/css2?family=${encodeURIComponent(name).replace(/%20/g,'+')}:wght@100..900&display=swap`;
+    await new Promise(r=>setTimeout(r,400)); }
+  rebuildSchedule();
+}
+document.querySelectorAll('input,select').forEach(el=>{ if(el.id==='expsize'||FONTCTRL.includes(el.id))return; el.addEventListener('input',schedule); });
+document.getElementById('fontsel').addEventListener('change',()=>{ document.getElementById('fw').value=document.getElementById('fontsel').value.split('|')[1]; rebuildSchedule(); });
+document.getElementById('fontcustom').addEventListener('input',()=>{ clearTimeout(customTimer); customTimer=setTimeout(loadCustomFont,450); });
+document.getElementById('fw').addEventListener('input',rebuildSchedule);
+document.getElementById('reseed').onclick=()=>{ seed.value=(Math.random()*100000|0); schedule(); };
+document.getElementById('reset').onclick=()=>{
+  const d={seed:11,glow:1,dust:0,psize:1,dens:15,soft:0.28,scat:2600,stars:1400,spark:22,neb:0.6,vig:0.45,bg:'#06080e',c0:'#d65a6e',c1:'#52b4a3',c2:'#aace4e',c3:'#f3ee6d',fw:800};
+  for(const k in d){ document.getElementById(k).value=d[k]; }
+  document.getElementById('fontsel').selectedIndex=0; document.getElementById('fontcustom').value='';
+  rebuildSchedule();
+};
+document.getElementById('download').onclick=()=>{
+  const CS=+document.getElementById('expsize').value; const st=document.getElementById('status'); st.textContent='輸出中…';
+  setTimeout(()=>{ const oc=document.createElement('canvas'); oc.width=oc.height=CS; renderTo(oc.getContext('2d'),CS);
+    oc.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=`ten_10_${CS}.png`; a.click(); URL.revokeObjectURL(a.href); st.textContent='已下載 '+CS+'px'; }, 'image/png'); }, 30);
+};
+
+// ---------- 啟動 ----------
+async function init(){ readParams(); await ensureFont(); try{ await document.fonts.ready; }catch(e){} buildMask(); schedule(); }
+init();
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
