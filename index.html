@@ -33,6 +33,7 @@
   button.primary{ background:var(--accent); color:#211a00; border-color:var(--accent); font-weight:700; }
   select{ font:inherit; font-size:13px; padding:8px; border-radius:8px; border:1px solid var(--line); background:var(--panel2); color:var(--text); }
   canvas#view{ width:min(76vh,720px); height:min(76vh,720px); border-radius:14px; box-shadow:0 10px 40px rgba(0,0,0,.6); background:#000; }
+  canvas#view.checker{ background-color:#20242e; background-image:linear-gradient(45deg,#333846 25%,transparent 25%,transparent 75%,#333846 75%),linear-gradient(45deg,#333846 25%,transparent 25%,transparent 75%,#333846 75%); background-size:28px 28px; background-position:0 0,14px 14px; }
   .stagebar{ display:flex; gap:10px; align-items:center; }
   .seedline{ display:flex; gap:8px; align-items:center; }
   .seedline input{ width:80px; font:inherit; padding:7px; border-radius:7px; border:1px solid var(--line); background:var(--panel2); color:var(--text); }
@@ -117,6 +118,7 @@
         <option value="3200" selected>3200 × 3200（高解析）</option>
         <option value="4800">4800 × 4800（印刷大圖）</option>
       </select>
+      <label class="foot" style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="transp" style="accent-color:var(--accent);"> 透明背景</label>
       <button class="primary" id="download">⬇ 下載 PNG</button>
       <span class="foot" id="status"></span>
     </div>
@@ -246,20 +248,22 @@ function drawParticles(ctx,g,which){
 }
 
 // ---------- 渲染到任意尺寸 ----------
-function renderTo(ctx, CS){
+function renderTo(ctx, CS, transparent){
   const g=CS/LOGI;
-  ctx.globalCompositeOperation='source-over'; ctx.filter='none';
-  ctx.fillStyle=P.bg; ctx.fillRect(0,0,CS,CS);
+  // 透明輸出：先把光疊在純黑上，最後用亮度當 alpha，讓黑底變透明
+  const work = transparent ? (()=>{ const c=document.createElement('canvas'); c.width=c.height=CS; return c.getContext('2d'); })() : ctx;
+  work.globalCompositeOperation='source-over'; work.filter='none';
+  work.fillStyle = transparent ? '#000' : P.bg; work.fillRect(0,0,CS,CS);
 
-  // nebula
-  if(P.neb>0){
+  // nebula（透明輸出時略過，避免藍霧污染）
+  if(P.neb>0 && !transparent){
     const nb=document.createElement('canvas'); nb.width=nb.height=CS; const nc=nb.getContext('2d');
     nc.fillStyle='#fff'; nc.textAlign='center'; nc.textBaseline='middle';
     nc.filter=`blur(${140*g}px)`;
     nc.font=`${(P.fontWeight||'800')} ${Math.round(1000*g)}px ${(P.fontFamily||'"Nunito"')},"Helvetica Neue",Arial,sans-serif`;
     nc.fillText('10',CS/2,CS/2); nc.filter='none';
     nc.globalCompositeOperation='source-in'; nc.fillStyle='rgb(13,16,28)'; nc.fillRect(0,0,CS,CS);
-    ctx.globalAlpha=P.neb; ctx.globalCompositeOperation='lighter'; ctx.drawImage(nb,0,0); ctx.globalAlpha=1;
+    work.globalAlpha=P.neb; work.globalCompositeOperation='lighter'; work.drawImage(nb,0,0); work.globalAlpha=1;
   }
 
   // sharp & soft layers (offscreen at CS)
@@ -267,13 +271,13 @@ function renderTo(ctx, CS){
   const so=document.createElement('canvas'); so.width=so.height=CS; const soc=so.getContext('2d'); drawParticles(soc,g,'soft');
 
   // soft defocused (blurred, lighter)
-  ctx.globalCompositeOperation='lighter';
-  for(const [r,w] of [[6,0.9],[16,0.5],[40,0.35]]){ ctx.globalAlpha=w; ctx.filter=`blur(${r*g}px)`; ctx.drawImage(so,0,0);}
-  ctx.filter='none'; ctx.globalAlpha=1;
+  work.globalCompositeOperation='lighter';
+  for(const [r,w] of [[6,0.9],[16,0.5],[40,0.35]]){ work.globalAlpha=w; work.filter=`blur(${r*g}px)`; work.drawImage(so,0,0);}
+  work.filter='none'; work.globalAlpha=1;
 
   // bloom from sharp
-  for(const [r,w] of [[4,0.7],[11,0.55],[28,0.4],[70,0.24],[140,0.14]]){ ctx.globalAlpha=Math.min(1,w*P.glow); ctx.filter=`blur(${r*g}px)`; ctx.drawImage(sh,0,0);}
-  ctx.filter='none'; ctx.globalAlpha=1;
+  for(const [r,w] of [[4,0.7],[11,0.55],[28,0.4],[70,0.24],[140,0.14]]){ work.globalAlpha=Math.min(1,w*P.glow); work.filter=`blur(${r*g}px)`; work.drawImage(sh,0,0);}
+  work.filter='none'; work.globalAlpha=1;
 
   // stars
   const st=document.createElement('canvas'); st.width=st.height=CS; const stc=st.getContext('2d');
@@ -283,22 +287,31 @@ function renderTo(ctx, CS){
   stc.strokeStyle='rgba(150,165,195,0.7)'; stc.lineWidth=Math.max(1,g*0.7);
   for(const s of SPARKS){ const L=s.L*g,x=s.x*g,y=s.y*g; stc.beginPath(); stc.moveTo(x-L,y); stc.lineTo(x+L,y); stc.moveTo(x,y-L); stc.lineTo(x,y+L); stc.stroke();
     stc.fillStyle='#fff'; stc.beginPath(); stc.arc(x,y,2*g,0,7); stc.fill(); }
-  ctx.globalCompositeOperation='lighter'; ctx.filter=`blur(${0.6*g}px)`; ctx.drawImage(st,0,0); ctx.filter='none';
+  work.globalCompositeOperation='lighter'; work.filter=`blur(${0.6*g}px)`; work.drawImage(st,0,0); work.filter='none';
 
   // crisp cores
-  ctx.drawImage(sh,0,0);
+  work.drawImage(sh,0,0);
 
-  // vignette
-  ctx.globalCompositeOperation='multiply';
-  const vg=ctx.createRadialGradient(CS/2,CS/2,CS*0.2,CS/2,CS/2,CS*0.72);
-  vg.addColorStop(0,'#ffffff'); vg.addColorStop(1,`rgba(${Math.round(255*(1-P.vig*0.5))},${Math.round(255*(1-P.vig*0.5))},${Math.round(255*(1-P.vig*0.5))},1)`);
-  ctx.fillStyle=vg; ctx.fillRect(0,0,CS,CS);
-  ctx.globalCompositeOperation='source-over';
+  if(!transparent){
+    // vignette
+    work.globalCompositeOperation='multiply';
+    const vg=work.createRadialGradient(CS/2,CS/2,CS*0.2,CS/2,CS/2,CS*0.72);
+    vg.addColorStop(0,'#ffffff'); vg.addColorStop(1,`rgba(${Math.round(255*(1-P.vig*0.5))},${Math.round(255*(1-P.vig*0.5))},${Math.round(255*(1-P.vig*0.5))},1)`);
+    work.fillStyle=vg; work.fillRect(0,0,CS,CS);
+    work.globalCompositeOperation='source-over';
+  } else {
+    // 用每個像素的亮度當 alpha（glow 疊在透明上，方便後製）
+    const id=work.getImageData(0,0,CS,CS); const d=id.data;
+    for(let i=0;i<d.length;i+=4){ d[i+3]=Math.max(d[i],d[i+1],d[i+2]); }
+    work.putImageData(id,0,0);
+    ctx.clearRect(0,0,CS,CS); ctx.drawImage(work.canvas,0,0);
+  }
 }
 
 // ---------- 事件 ----------
 let raf=null;
-function schedule(){ readParams(); if(raf)cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>{ generate(); renderTo(vctx, view.width); }); }
+function isTransp(){ return document.getElementById('transp').checked; }
+function schedule(){ readParams(); if(raf)cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>{ generate(); const t=isTransp(); view.classList.toggle('checker',t); renderTo(vctx, view.width, t); }); }
 const FONTCTRL=['fontsel','fontcustom','fw'];
 // 等 web 字體真的載入完成，canvas 才畫得出來（否則會用替代字體）
 async function ensureFont(){ try{ await document.fonts.load(`${P.fontWeight||400} 100px ${P.fontFamily||'"Nunito"'}`); }catch(e){} }
@@ -312,7 +325,8 @@ async function loadCustomFont(){
     await new Promise(r=>setTimeout(r,400)); }
   rebuildSchedule();
 }
-document.querySelectorAll('input,select').forEach(el=>{ if(el.id==='expsize'||FONTCTRL.includes(el.id))return; el.addEventListener('input',schedule); });
+document.querySelectorAll('input,select').forEach(el=>{ if(el.id==='expsize'||el.id==='transp'||FONTCTRL.includes(el.id))return; el.addEventListener('input',schedule); });
+document.getElementById('transp').addEventListener('change',schedule);
 document.getElementById('fontsel').addEventListener('change',()=>{ document.getElementById('fw').value=document.getElementById('fontsel').value.split('|')[1]; rebuildSchedule(); });
 document.getElementById('fontcustom').addEventListener('input',()=>{ clearTimeout(customTimer); customTimer=setTimeout(loadCustomFont,450); });
 document.getElementById('fw').addEventListener('input',rebuildSchedule);
@@ -324,9 +338,9 @@ document.getElementById('reset').onclick=()=>{
   rebuildSchedule();
 };
 document.getElementById('download').onclick=()=>{
-  const CS=+document.getElementById('expsize').value; const st=document.getElementById('status'); st.textContent='輸出中…';
-  setTimeout(()=>{ const oc=document.createElement('canvas'); oc.width=oc.height=CS; renderTo(oc.getContext('2d'),CS);
-    oc.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=`ten_10_${CS}.png`; a.click(); URL.revokeObjectURL(a.href); st.textContent='已下載 '+CS+'px'; }, 'image/png'); }, 30);
+  const CS=+document.getElementById('expsize').value; const t=isTransp(); const st=document.getElementById('status'); st.textContent='輸出中…';
+  setTimeout(()=>{ const oc=document.createElement('canvas'); oc.width=oc.height=CS; renderTo(oc.getContext('2d'),CS,t);
+    oc.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=`ten_10_${CS}${t?'_transparent':''}.png`; a.click(); URL.revokeObjectURL(a.href); st.textContent='已下載 '+CS+'px'+(t?'（透明底）':''); }, 'image/png'); }, 30);
 };
 
 // ---------- 啟動 ----------
