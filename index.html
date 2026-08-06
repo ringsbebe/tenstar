@@ -56,6 +56,18 @@
     </div>
 
     <div class="group">
+      <h2>形狀來源</h2>
+      <div class="row"><label>上傳圖片當形狀（logo／符號／剪影）</label>
+        <input type="file" id="imgfile" accept="image/*" style="width:100%;font-size:11.5px;color:var(--sub);"></div>
+      <div id="imgopts" style="display:none;">
+        <div class="row"><label>形狀臨界值 <span class="val" id="v_thr"></span></label><input type="range" id="thr" min="1" max="254" step="1" value="128"></div>
+        <div class="row"><label style="cursor:pointer;">反轉形狀（明暗互換）<input type="checkbox" id="inv" style="accent-color:var(--accent);"></label></div>
+        <div class="btns"><button id="clearimg">✕ 清除圖片，改用文字「10」</button></div>
+      </div>
+      <p class="hint" style="margin:6px 0 0;">留空＝用下方文字「10」。去背 PNG（logo）效果最好；一般照片可用臨界值／反轉調出主體輪廓。</p>
+    </div>
+
+    <div class="group">
       <h2>「10」字體</h2>
       <div class="row"><label>字體</label>
         <select id="fontsel" style="width:100%;">
@@ -86,6 +98,7 @@
 
     <div class="group">
       <h2>星空背景</h2>
+      <div class="row"><label style="cursor:pointer;">顯示星點（輸出也套用）<input type="checkbox" id="showstars" checked style="accent-color:var(--accent);"></label></div>
       <div class="row"><label>星點數 <span class="val" id="v_stars"></span></label><input type="range" id="stars" min="0" max="3000" step="50" value="1400"></div>
       <div class="row"><label>星芒數 <span class="val" id="v_spark"></span></label><input type="range" id="spark" min="0" max="60" step="1" value="22"></div>
       <div class="row"><label>星雲層次 <span class="val" id="v_neb"></span></label><input type="range" id="neb" min="0" max="1.5" step="0.05" value="0.6"></div>
@@ -144,6 +157,9 @@ function readParams(){
   P.cols=[c0.value,c1.value,c2.value,c3.value];
   const _sf=document.getElementById('fontsel').value.split('|'); const _cust=document.getElementById('fontcustom').value.trim();
   P.fontFamily=_cust?('"'+_cust+'"'):_sf[0]; P.fontWeight=document.getElementById('fw').value;
+  P.showStars=document.getElementById('showstars').checked;
+  P.imgThr=+document.getElementById('thr').value; P.imgInv=document.getElementById('inv').checked;
+  document.getElementById('v_thr').textContent=P.imgThr;
   v_fw.textContent=P.fontWeight;
   // labels
   v_glow.textContent=P.glow.toFixed(2); v_dust.textContent=P.dust.toFixed(2);
@@ -154,20 +170,40 @@ function readParams(){
 }
 function hex2rgb(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
 
-// ---------- 遮罩（只算一次）：得到「10」內部像素與輪廓點（LOGI 空間）----------
-let INSIDE=null, OUTLINE=[], FIELD=null;
+// ---------- 遮罩：得到形狀內部像素與輪廓點（LOGI 空間）。形狀來源＝上傳圖片或文字「10」----------
+let INSIDE=null, OUTLINE=[], FIELD=null, USER_IMG=null, SILH=null;
 function buildMask(){
-  const m=document.createElement('canvas'); m.width=m.height=MASKRES;
-  const mc=m.getContext('2d');
-  mc.fillStyle='#000'; mc.fillRect(0,0,MASKRES,MASKRES);
-  mc.fillStyle='#fff'; mc.textAlign='center'; mc.textBaseline='middle';
-  const _fam=(P.fontFamily||'"Nunito"'), _fw=(P.fontWeight||'800');
-  mc.font=`${_fw} ${Math.round(MASKRES*0.62)}px ${_fam},"Helvetica Neue",Arial,sans-serif`;
-  mc.fillText('10', MASKRES/2, MASKRES/2);
-  const d=mc.getImageData(0,0,MASKRES,MASKRES).data;
+  const m=document.createElement('canvas'); m.width=m.height=MASKRES; const mc=m.getContext('2d');
   const ins=new Uint8Array(MASKRES*MASKRES);
-  for(let i=0;i<ins.length;i++) ins[i]= d[i*4]>128?1:0;
+  if(USER_IMG){
+    // 上傳的圖片：置中縮放後，用透明度或明暗臨界值判斷「形狀內部」
+    mc.clearRect(0,0,MASKRES,MASKRES);
+    const iw=USER_IMG.naturalWidth||USER_IMG.width, ih=USER_IMG.naturalHeight||USER_IMG.height;
+    const sc=Math.min(MASKRES*0.86/iw, MASKRES*0.86/ih), dw=iw*sc, dh=ih*sc;
+    mc.drawImage(USER_IMG,(MASKRES-dw)/2,(MASKRES-dh)/2,dw,dh);
+    const d=mc.getImageData(0,0,MASKRES,MASKRES).data;
+    let hasAlpha=false; for(let i=3;i<d.length;i+=4){ if(d[i]<245){ hasAlpha=true; break; } }
+    const thr=P.imgThr, inv=P.imgInv;
+    for(let p=0;p<ins.length;p++){ const i=p*4; let inside;
+      if(hasAlpha){ inside = d[i+3] > thr; }                                   // 去背 PNG：用 alpha
+      else { const lum=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; inside = inv ? (lum>thr) : (lum<thr); } // 一般圖：用明暗
+      ins[p]= inside?1:0;
+    }
+  } else {
+    mc.fillStyle='#000'; mc.fillRect(0,0,MASKRES,MASKRES);
+    mc.fillStyle='#fff'; mc.textAlign='center'; mc.textBaseline='middle';
+    const _fam=(P.fontFamily||'"Nunito"'), _fw=(P.fontWeight||'800');
+    mc.font=`${_fw} ${Math.round(MASKRES*0.62)}px ${_fam},"Helvetica Neue",Arial,sans-serif`;
+    mc.fillText('10', MASKRES/2, MASKRES/2);
+    const d=mc.getImageData(0,0,MASKRES,MASKRES).data;
+    for(let p=0;p<ins.length;p++) ins[p]= d[p*4]>128?1:0;
+  }
   INSIDE=ins;
+  // 白色剪影（星雲與距離場共用，文字/圖片皆適用）
+  const sil=document.createElement('canvas'); sil.width=sil.height=MASKRES; const sc2=sil.getContext('2d');
+  const sid=sc2.createImageData(MASKRES,MASKRES); const sd=sid.data;
+  for(let p=0;p<ins.length;p++){ if(ins[p]){ sd[p*4]=255;sd[p*4+1]=255;sd[p*4+2]=255;sd[p*4+3]=255; } }
+  sc2.putImageData(sid,0,0); SILH=sil;
   // 輪廓帶：內部像素且環狀鄰居有在外面
   const R=Math.max(3,Math.round(9*MASKRES/LOGI));
   const idx=(x,y)=>y*MASKRES+x; OUTLINE=[];
@@ -176,10 +212,10 @@ function buildMask(){
     if(!ins[idx(x,y)])continue;
     for(const o of offs){ if(!ins[idx(x+o[0],y+o[1])]){ OUTLINE.push([x*LOGI/MASKRES,y*LOGI/MASKRES]); break; } }
   }
-  // 距離場（給外圍飄散用）：模糊剪影
+  // 距離場（給外圍飄散用）：黑底 + 模糊剪影
   const f=document.createElement('canvas'); f.width=f.height=MASKRES; const fc=f.getContext('2d');
-  fc.filter=`blur(${Math.round(120*MASKRES/LOGI)}px)`;
-  fc.drawImage(m,0,0); fc.filter='none';
+  fc.fillStyle='#000'; fc.fillRect(0,0,MASKRES,MASKRES);
+  fc.filter=`blur(${Math.round(120*MASKRES/LOGI)}px)`; fc.drawImage(sil,0,0); fc.filter='none';
   FIELD=fc.getImageData(0,0,MASKRES,MASKRES).data;
 }
 function insideAt(x,y){ const mx=(x*MASKRES/LOGI)|0, my=(y*MASKRES/LOGI)|0; if(mx<0||my<0||mx>=MASKRES||my>=MASKRES)return false; return INSIDE[my*MASKRES+mx]===1; }
@@ -255,13 +291,11 @@ function renderTo(ctx, CS, transparent){
   work.globalCompositeOperation='source-over'; work.filter='none';
   work.fillStyle = transparent ? '#000' : P.bg; work.fillRect(0,0,CS,CS);
 
-  // nebula（透明輸出時略過，避免藍霧污染）
-  if(P.neb>0 && !transparent){
+  // nebula（透明輸出時略過，避免藍霧污染）— 用剪影，文字/圖片皆適用
+  if(P.neb>0 && !transparent && SILH){
     const nb=document.createElement('canvas'); nb.width=nb.height=CS; const nc=nb.getContext('2d');
-    nc.fillStyle='#fff'; nc.textAlign='center'; nc.textBaseline='middle';
     nc.filter=`blur(${140*g}px)`;
-    nc.font=`${(P.fontWeight||'800')} ${Math.round(1000*g)}px ${(P.fontFamily||'"Nunito"')},"Helvetica Neue",Arial,sans-serif`;
-    nc.fillText('10',CS/2,CS/2); nc.filter='none';
+    nc.drawImage(SILH,0,0,SILH.width,SILH.height,0,0,CS,CS); nc.filter='none';
     nc.globalCompositeOperation='source-in'; nc.fillStyle='rgb(13,16,28)'; nc.fillRect(0,0,CS,CS);
     work.globalAlpha=P.neb; work.globalCompositeOperation='lighter'; work.drawImage(nb,0,0); work.globalAlpha=1;
   }
@@ -279,15 +313,17 @@ function renderTo(ctx, CS, transparent){
   for(const [r,w] of [[4,0.7],[11,0.55],[28,0.4],[70,0.24],[140,0.14]]){ work.globalAlpha=Math.min(1,w*P.glow); work.filter=`blur(${r*g}px)`; work.drawImage(sh,0,0);}
   work.filter='none'; work.globalAlpha=1;
 
-  // stars
-  const st=document.createElement('canvas'); st.width=st.height=CS; const stc=st.getContext('2d');
-  for(const s of STARS){ const inten=(0.25+0.75*s.b*s.b); const rr=Math.max(1,(s.b<0.7?1:2)*g*0.7);
-    let c; if(s.t<0.72)c=`rgba(255,255,255,${inten})`; else if(s.t<0.9)c=`rgba(205,225,255,${inten})`; else c=`rgba(255,240,205,${inten})`;
-    stc.fillStyle=c; stc.beginPath(); stc.arc(s.x*g,s.y*g,rr,0,7); stc.fill(); }
-  stc.strokeStyle='rgba(150,165,195,0.7)'; stc.lineWidth=Math.max(1,g*0.7);
-  for(const s of SPARKS){ const L=s.L*g,x=s.x*g,y=s.y*g; stc.beginPath(); stc.moveTo(x-L,y); stc.lineTo(x+L,y); stc.moveTo(x,y-L); stc.lineTo(x,y+L); stc.stroke();
-    stc.fillStyle='#fff'; stc.beginPath(); stc.arc(x,y,2*g,0,7); stc.fill(); }
-  work.globalCompositeOperation='lighter'; work.filter=`blur(${0.6*g}px)`; work.drawImage(st,0,0); work.filter='none';
+  // stars（可用「顯示星點」開關關閉；影響預覽與輸出）
+  if(P.showStars){
+    const st=document.createElement('canvas'); st.width=st.height=CS; const stc=st.getContext('2d');
+    for(const s of STARS){ const inten=(0.25+0.75*s.b*s.b); const rr=Math.max(1,(s.b<0.7?1:2)*g*0.7);
+      let c; if(s.t<0.72)c=`rgba(255,255,255,${inten})`; else if(s.t<0.9)c=`rgba(205,225,255,${inten})`; else c=`rgba(255,240,205,${inten})`;
+      stc.fillStyle=c; stc.beginPath(); stc.arc(s.x*g,s.y*g,rr,0,7); stc.fill(); }
+    stc.strokeStyle='rgba(150,165,195,0.7)'; stc.lineWidth=Math.max(1,g*0.7);
+    for(const s of SPARKS){ const L=s.L*g,x=s.x*g,y=s.y*g; stc.beginPath(); stc.moveTo(x-L,y); stc.lineTo(x+L,y); stc.moveTo(x,y-L); stc.lineTo(x,y+L); stc.stroke();
+      stc.fillStyle='#fff'; stc.beginPath(); stc.arc(x,y,2*g,0,7); stc.fill(); }
+    work.globalCompositeOperation='lighter'; work.filter=`blur(${0.6*g}px)`; work.drawImage(st,0,0); work.filter='none';
+  }
 
   // crisp cores
   work.drawImage(sh,0,0);
@@ -325,8 +361,19 @@ async function loadCustomFont(){
     await new Promise(r=>setTimeout(r,400)); }
   rebuildSchedule();
 }
-document.querySelectorAll('input,select').forEach(el=>{ if(el.id==='expsize'||el.id==='transp'||FONTCTRL.includes(el.id))return; el.addEventListener('input',schedule); });
+const SKIP=['expsize','transp','showstars','imgfile','thr','inv',...FONTCTRL];
+document.querySelectorAll('input,select').forEach(el=>{ if(SKIP.includes(el.id))return; el.addEventListener('input',schedule); });
 document.getElementById('transp').addEventListener('change',schedule);
+document.getElementById('showstars').addEventListener('change',schedule);
+// 上傳圖片當形狀
+document.getElementById('imgfile').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f)return; const url=URL.createObjectURL(f); const img=new Image();
+  img.onload=()=>{ USER_IMG=img; document.getElementById('imgopts').style.display=''; rebuildSchedule(); };
+  img.onerror=()=>{ alert('圖片讀取失敗，換一張試試'); }; img.src=url;
+});
+document.getElementById('thr').addEventListener('input',rebuildSchedule);
+document.getElementById('inv').addEventListener('change',rebuildSchedule);
+document.getElementById('clearimg').addEventListener('click',()=>{ USER_IMG=null; document.getElementById('imgopts').style.display='none'; document.getElementById('imgfile').value=''; rebuildSchedule(); });
 document.getElementById('fontsel').addEventListener('change',()=>{ document.getElementById('fw').value=document.getElementById('fontsel').value.split('|')[1]; rebuildSchedule(); });
 document.getElementById('fontcustom').addEventListener('input',()=>{ clearTimeout(customTimer); customTimer=setTimeout(loadCustomFont,450); });
 document.getElementById('fw').addEventListener('input',rebuildSchedule);
@@ -335,6 +382,8 @@ document.getElementById('reset').onclick=()=>{
   const d={seed:11,glow:1,dust:0,psize:1,dens:15,soft:0.28,scat:2600,stars:1400,spark:22,neb:0.6,vig:0.45,bg:'#06080e',c0:'#d65a6e',c1:'#52b4a3',c2:'#aace4e',c3:'#f3ee6d',fw:800};
   for(const k in d){ document.getElementById(k).value=d[k]; }
   document.getElementById('fontsel').selectedIndex=0; document.getElementById('fontcustom').value='';
+  document.getElementById('showstars').checked=true; document.getElementById('thr').value=128; document.getElementById('inv').checked=false;
+  USER_IMG=null; document.getElementById('imgopts').style.display='none'; document.getElementById('imgfile').value='';
   rebuildSchedule();
 };
 document.getElementById('download').onclick=()=>{
